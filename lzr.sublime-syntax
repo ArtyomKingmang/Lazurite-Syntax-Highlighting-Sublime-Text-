@@ -1,0 +1,196 @@
+%YAML 1.2
+---
+name: Lazurite
+
+file_extensions: [lazurite]
+
+scope: source.lazurite
+
+variables:
+  support: 'print|include|using|println|echo|readln|length|getBytes|sprintf|range|substring|parseInt|parseLong|filter'
+  control: 'if|else|for|while|match|case|return|break|continue|func|class|new|foreach|throw|and|or|not'
+  type: 'str|num|byte|short|long|int|float|double'
+
+  identifier: '[[A-Za-z0-9]_]+'
+
+contexts:
+  prototype:
+    - include: comment
+
+  main:
+    - include: definitions
+    - include: expressions
+
+
+  support:
+    - match: '\b{{support}}\b'
+      scope: support.function.lzr function-call
+
+
+  # [keywords]
+  definitions:
+    # function definition
+    - match: '\bfunction\b'
+      scope: keyword.function.lzr
+      set:
+        - match: '{{identifier}}(?=\s*\()'
+          scope: meta.function.lzr entity.name.function.lzr
+          set:
+            - match: \(
+              scope: punctuation.section.group.begin
+              set:
+                - meta_scope: meta.group.lzr meta.function.parameters.lzr
+                - match: \)
+                  scope: punctuation.section.group.end
+                  set: function-block
+                - match: '{{identifier}}(?=\s*(,|\)))'
+                  scope: variable.parameter.lzr
+
+                - include: expressions
+    # combo definition
+    - match: '\bcombo\b'
+      scope: keyword.function.lzr
+      set:
+        - match: '{{identifier}}(?=\s*\{)'
+          scope: meta.function.lzr entity.name.function.lzr
+          set: function-block
+    # sections
+    - match: '\b(main|init)\b'
+      scope: variable.language.lzr meta.function.lzr entity.name.function.lzr
+      set: function-block
+    # define
+    - match: '\bdefine\b'
+      scope: keyword.declaration.lzr
+      set:
+        - match: '{{identifier}}(?=\s*\=)'
+          scope: entity.name.constant
+          pop: true
+    # remap
+    - match: '\bremap\b'
+      scope: keyword.declaration.lzr
+      pop: true
+    # enum
+    - match: '\benum\b'
+      scope: keyword.declaration.enum.lzr meta.enum.lzr
+      set: enum-block
+
+  expressions:
+    - include: support
+    - include: parens
+    - include: block
+    - include: operators
+    - include: type
+    - include: statements
+    - include: call
+    - include: string
+    - include: integer
+    - match: ';'
+      scope: punctuation.terminator.lzr
+    - match: ','
+      scope: punctuation.separator.lzr
+
+  type:
+    - match: '\b{{type}}\b'
+      scope: storage.type.lzr
+
+  parens:
+    - match: \(
+      scope: punctuation.section.group.begin
+      set:
+        - meta_scope: meta.group.lzr
+        - match: \)
+          scope: punctuation.section.group.end
+          pop: true
+
+        - include: expressions
+
+  block:
+    - match: '\{'
+      scope: meta.block.lzr punctuation.section.block.begin.lzr
+      set:
+        - meta_content_scope: meta.block.lzr
+        - match: '\}'
+          scope: punctuation.section.block.end.lzr
+          pop: true
+
+        - include: expressions
+  function-block:
+    - meta_content_scope: meta.function.lzr
+    - match: '\{'
+      scope: meta.block.lzr punctuation.section.block.begin
+      set:
+        - meta_content_scope: meta.block.lzr meta.function.lzr
+        - match: '\}'
+          scope: punctuation.section.block.end.lzr meta.function.lzr meta.block
+          pop: true
+
+        - include: expressions
+  enum-block:
+    - match: '\{'
+      scope: meta.block.lzr punctuation.section.block.begin
+      set:
+        - meta_content_scope: meta.block.lzr meta.enum.lzr
+        - match: '\}'
+          scope: punctuation.section.block.end.lzr meta.block
+          pop: true
+
+        - match: '[A-z0-9=_-]+'
+          scope: storage.type.enum.lzr
+
+  #statements
+  statements:
+    - match: '\b{{control}}\b'
+      scope: keyword.control.lzr
+      set: expressions
+
+  #call
+  call:
+    - meta_content_scope: meta.function-call
+    - match: '{{identifier}}(?=\s*\()'
+      scope: variable.function.lzr
+      set: parens
+
+  #operators
+  operators:
+    - match: '(\+\+|--|\*|/|%|\+|-)'
+      scope: keyword.operator.arithmetic.lzr
+    - match: '(&|\||\^|<<|>>)'
+      scope: keyword.operator.bitwise.lzr
+    - match: '(&&|\|\||\^\^|!|>=|<=|<|>)'
+      scope: keyword.operator.logical.lzr
+    - match: '(\+=|-=|\*=|/=|%=|=)'
+      scope: keyword.operator.assignment.lzr
+
+  #comments
+  comment:
+    - match: '//'
+      scope: punctuation.definition.comment.lzr
+      push:
+        - meta_scope: comment.line.double-slash.lzr
+        - match: $\n?
+          pop: true
+
+    - match: '/\*'
+      scope: punctuation.definition.comment.lzr
+      push:
+        - meta_scope: comment.block.lzr
+        - match: '\*/'
+          pop: true
+
+  #strings
+  string:
+    - match: '([\"''])((?:(?=(?:\\)*)\\.|.)*?)(\1)'
+      scope: punctuation.definition.string
+      captures:
+        1: punctuation.definition.string.begin
+        2: punctuation.definition.string
+        3: punctuation.definition.string.end
+
+  #integers
+  integer:
+    # dec
+    - match: '\b\+?[0-9]+\b'
+      scope: constant.numeric.integer.decimal constant.numeric.value.lzr
+    # hex
+    - match: '\b0x[0-9A-Fa-f]+\b'
+      scope: constant.numeric.integer.hexadecimal constant.numeric.value.lzr
